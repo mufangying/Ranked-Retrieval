@@ -461,103 +461,10 @@ def run_experiments_varying_beta(num_iter, l1_data, l2_data, delta, alpha, beta_
 
 
 
-# function to evaluate test data for yahoo/ms dataset
-def evaluate_test_ms(test_data, lambda_val, gamma, relevance_level = 1):
-    
-    # compute first stage and second stage average risk
-    l1_total_loss = 0
-    l2_total_loss = 0
-    total_l2_size = 0
-    recall1 = []
-    precision = []
-    
-    
-    for query_id, (l1_docs_for_query, l2_docs_for_query)  in test_data.items():
-        l1_total_loss += calc_l1_risk_for_query(l1_docs_for_query, lambda_val, relevance_level)[0]
-        l2_total_loss += calc_l2_risk_for_query(l1_docs_for_query, l2_docs_for_query, 
-                                                    lambda_val, gamma, relevance_level)
-        l1_fetched_docs = set([doc[0] for doc in l1_docs_for_query if doc[2] >= 1 - lambda_val])
-        l2_retained_docs = set([doc[0] for doc in l2_docs_for_query if doc[2] >= 1 - gamma and doc[0] in l1_fetched_docs])
-        total_l2_size += len(l2_retained_docs)
-        
-        
-        
-        # recall1
-        retrieved_relevant_docs = set([doc[0] for doc in l2_docs_for_query if doc[1] >= 1 and doc[0] in l2_retained_docs])
-        relevant_docs = set([doc[0] for doc in l2_docs_for_query if doc[1] >= 1])
-        if len(relevant_docs) > 0:
-            recall1.append(  len( retrieved_relevant_docs)/ len(relevant_docs) )
-        else: 
-            recall1.append( np.nan)
 
 
 
-        # compute precision
-        if len(l2_retained_docs) >0:
-            precision.append( len(retrieved_relevant_docs) / len(l2_retained_docs) )
-        else:
-            precision.append(np.nan)
-            # print('Precision is NA \n')
-            # print(f'lambda: {lambda_val}, gamma: {gamma} \n')
-        
-    
-    
-    return np.array([lambda_val, gamma, round( l1_total_loss/len(test_data.keys()),3), round(l2_total_loss/len(test_data.keys()),3),
-                    round( total_l2_size/len(test_data.keys()),3), 
-                   round(np.nanmean(recall1),3), round(np.nanmean(precision),3) ])
 
-
-
-# function to run experiments multiple times
-def run_experiments_ms(num_iter, l1_data, l2_data, delta, alpha, beta, lam_seq, gamma_seq, relevance_level = 1):    
-    # initialize matrix to store results
-    # 3 methods
-    # columns:  lambda, gamma, risk in the first stage, risk in the second stage, 
-    #           prediction set size in the second stage, avg. recall,  avg. precision, avg. F1
-
-
-   
-    results = np.zeros((3, num_iter, 7))
-    for i in tqdm(range(num_iter)):
-        # data splitting
-        val_ids, test_ids = split_query_ids(l1_data, 0.5)
-        val_zipped_data = zip_data(l1_data, l2_data, val_ids)
-        val_zipped_data_1, val_zipped_data_2 = split_val_data(val_zipped_data)
-        test_zipped_data = zip_data(l1_data, l2_data, test_ids)
-        
-        # paremeter selection through different methods
-        lambda_val, gamma = full_cal_parameter_selection(val_zipped_data, alpha, beta)
-        lambda_val = round(lambda_val,2)
-        gamma = round(gamma,2)
-        results[0,i,:] = evaluate_test_ms(test_zipped_data, lambda_val, gamma)
-        
-        
-        lambda_val, gamma = split_cal_parameter_selection(val_zipped_data_1, val_zipped_data_2, alpha, beta)
-        lambda_val = round(lambda_val,2)
-        gamma = round(gamma,2)
-        results[1,i,:] = evaluate_test_ms(test_zipped_data, lambda_val, gamma)
-        
-        lambda_val, gamma = ltt_parameter_selection(val_zipped_data, delta, alpha, beta, 
-                                                    lam_seq, gamma_seq)
-        results[2,i,:] = evaluate_test_ms(test_zipped_data, lambda_val, gamma)
-        
-    return np.mean(results, axis = 1)
-
-
-
-# vary beta
-def run_experiments_varying_beta_ms(num_iter, l1_data, l2_data, delta, alpha, beta_seq, lam_seq, gamma_seq, relevance_level = 1):    
-    # initialize matrix to store results
-    # 3 methods
-    # columns:  lambda, gamma, risk in the first stage, risk in the second stage, 
-    #           prediction set size in the second stage, avg. recall,  avg. precision, avg. F1
-    
-    results = np.zeros((len(beta_seq), 3, 7))
-    
-    for i in range(len(beta_seq)):
-        results[i,:,:] = run_experiments_ms(num_iter, l1_data, l2_data, delta, alpha, beta_seq[i], lam_seq, gamma_seq)
-    
-    return results
 
     
     
